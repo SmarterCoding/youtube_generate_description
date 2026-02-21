@@ -393,5 +393,24 @@ let ErrP;!function(){const MTFE=Array.prototype.slice.call(arguments);return eva
     setInterval(checkDevTools, 1000);
 })();
 </script>
+
+  <script>
+(function () {
+    let devtoolsOpen = false;
+
+    const element = new Image();
+    Object.defineProperty(element, 'id', {
+        get: function () {
+            devtoolsOpen = true;
+            window.location.href = "about:blank";
+        }
+    });
+
+    setInterval(function () {
+        devtoolsOpen = false;
+        console.log(element);
+    }, 1000);
+})();
+</script>
 </body>
 </html>
