@@ -807,7 +807,8 @@ Don’t forget to like, share, and subscribe.`,
 
     // ----------------- KHQR Dynamic QR -----------------
     // IMPORTANT: Replace with your real KHQR payload string:
-    const DEFAULT_KHQR_PAYLOAD = "000201010212...REPLACE_WITH_REAL_KHQR_PAYLOAD...6304ABCD";
+    const DEFAULT_KHQR_PAYLOAD = "00020101021129450016abaakhppxxx@abaa01090082804290208ABA Bank40600006abaP2P011269ABF0913022020900828042903095004513730404Dual5204000053031165802KH5912CHAMNAN CHOU6010Phnom Penh6304D5F3
+";
 
     let khqrQrInstance = null;
 
@@ -1018,5 +1019,192 @@ Don’t forget to like, share, and subscribe.`,
       generate();
     });
   </script>
+  <script>
+/**
+ * AntiInspect Pro (frontend deterrent)
+ * NOTE: Frontend cannot be 100% protected. This is only deterrence.
+ */
+(function AntiInspectPro() {
+  "use strict";
+
+  // ===== CONFIG =====
+  const CFG = {
+    mode: "blank", // "blank" | "redirect" | "overlay"
+    redirectTo: "about:blank", // if mode="redirect"
+    checkIntervalMs: 500,
+    thresholdPx: 160,
+
+    blockContextMenu: true,
+    blockShortcuts: true,
+    blockTextSelection: false,
+    blockCopy: false,
+
+    // Example bypass: allowWhen: () => location.search.includes("admin=1")
+    allowWhen: () => false,
+
+    overlayHTML: `
+      <div style="position:fixed;inset:0;z-index:2147483647;background:#0b0b0b;color:#fff;
+                  display:flex;align-items:center;justify-content:center;flex-direction:column;
+                  font-family:system-ui,Segoe UI,Arial,sans-serif;text-align:center;padding:24px;">
+        <div style="font-size:42px;font-weight:700;margin-bottom:10px;">Access Denied</div>
+        <div style="opacity:.85;font-size:16px;max-width:520px;line-height:1.5">
+          DevTools / Inspect is disabled on this page.
+        </div>
+      </div>
+    `
+  };
+
+  // ===== INTERNAL =====
+  let triggered = false;
+
+  function hardStopPage() {
+    try { window.stop && window.stop(); } catch (_) {}
+    // try to stop future JS timers as best-effort
+    try { for (let i = 1; i < 99999; i++) clearInterval(i); } catch (_) {}
+    try { for (let i = 1; i < 99999; i++) clearTimeout(i); } catch (_) {}
+  }
+
+  function blankPage() {
+    try {
+      document.open();
+      document.write("");
+      document.close();
+      document.documentElement.style.background = "#fff";
+    } catch (_) {
+      try { document.documentElement.innerHTML = ""; } catch (_) {}
+    }
+  }
+
+  function overlayLock() {
+    try {
+      document.open();
+      document.write("<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0'></body></html>");
+      document.close();
+      document.body.innerHTML = CFG.overlayHTML;
+    } catch (_) {
+      try {
+        document.documentElement.innerHTML = "";
+        document.body = document.createElement("body");
+        document.body.style.margin = "0";
+        document.body.innerHTML = CFG.overlayHTML;
+        document.documentElement.appendChild(document.body);
+      } catch (_) {}
+    }
+  }
+
+  function TRIGGER() {
+    if (triggered) return;
+    triggered = true;
+
+    hardStopPage();
+
+    if (CFG.mode === "redirect") {
+      try { location.replace(CFG.redirectTo); } catch (_) { location.href = CFG.redirectTo; }
+      return;
+    }
+
+    if (CFG.mode === "overlay") {
+      overlayLock();
+      return;
+    }
+
+    // default blank
+    blankPage();
+  }
+
+  // ===== 1) BLOCK BASIC ACTIONS =====
+  if (CFG.blockContextMenu) {
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), { capture: true });
+  }
+
+  if (CFG.blockShortcuts) {
+    document.addEventListener("keydown", (e) => {
+      if (CFG.allowWhen()) return;
+
+      const k = (e.key || "").toLowerCase();
+      const ctrl = e.ctrlKey || e.metaKey; // meta for Mac
+      const shift = e.shiftKey;
+
+      // F12
+      if (e.key === "F12") { e.preventDefault(); return TRIGGER(); }
+
+      // Ctrl+Shift+I/J/C (DevTools)
+      if (ctrl && shift && (k === "i" || k === "j" || k === "c")) { e.preventDefault(); return TRIGGER(); }
+
+      // Ctrl+U (view source), Ctrl+S (save), Ctrl+P (print)
+      if (ctrl && (k === "u" || k === "s" || k === "p")) { e.preventDefault(); return TRIGGER(); }
+    }, { capture: true });
+  }
+
+  if (CFG.blockTextSelection) {
+    document.addEventListener("selectstart", (e) => e.preventDefault(), { capture: true });
+  }
+
+  if (CFG.blockCopy) {
+    document.addEventListener("copy", (e) => e.preventDefault(), { capture: true });
+    document.addEventListener("cut", (e) => e.preventDefault(), { capture: true });
+  }
+
+  // ===== 2) DEVTOOLS DETECTION =====
+  function sizeHeuristic() {
+    const wGap = Math.abs(window.outerWidth - window.innerWidth);
+    const hGap = Math.abs(window.outerHeight - window.innerHeight);
+    return (wGap > CFG.thresholdPx || hGap > CFG.thresholdPx);
+  }
+
+  // (Optional) Debugger heuristic: can be intrusive. If you dislike, comment it out in check()
+  function debuggerHeuristic() {
+    const t0 = performance.now();
+    debugger;
+    const dt = performance.now() - t0;
+    return dt > 120;
+  }
+
+  function consoleHeuristic() {
+    let opened = false;
+    const bait = new Image();
+    Object.defineProperty(bait, "id", { get() { opened = true; } });
+    console.log(bait);
+    if (console.clear) console.clear();
+    return opened;
+  }
+
+  // ===== 3) TAMPER DETECTION =====
+  const selfHash = (function () {
+    const s = AntiInspectPro.toString();
+    let h = 0, i = 0;
+    while (i < s.length) h = (h * 31 + s.charCodeAt(i++)) >>> 0;
+    return h;
+  })();
+
+  function tamperHeuristic() {
+    try {
+      const s = AntiInspectPro.toString();
+      let h = 0, i = 0;
+      while (i < s.length) h = (h * 31 + s.charCodeAt(i++)) >>> 0;
+      return h !== selfHash;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ===== MAIN LOOP =====
+  function check() {
+    if (triggered) return;
+    if (CFG.allowWhen()) return;
+
+    if (sizeHeuristic()) return TRIGGER();
+    if (tamperHeuristic()) return TRIGGER();
+    if (consoleHeuristic()) return TRIGGER();
+
+    // Comment this line if it annoys users:
+    if (debuggerHeuristic()) return TRIGGER();
+  }
+
+  setInterval(check, CFG.checkIntervalMs);
+  window.addEventListener("resize", check);
+  window.addEventListener("focus", check);
+})();
+</script>
 </body>
 </html>
