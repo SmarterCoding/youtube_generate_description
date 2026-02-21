@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YouTube Description Script Builder</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a2f;
+      --field:#0b1428;
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.65);
+      --border:rgba(255,255,255,.12);
+      --preview:#081024;
+    }
+
+    /* Auto light theme when system is light AND user didn't force dark */
+    @media (prefers-color-scheme: light) {
+      :root{
+        --bg:#f6f7fb;
+        --card:#ffffff;
+        --field:#f3f5f9;
+        --text:rgba(0,0,0,.88);
+        --muted:rgba(0,0,0,.55);
+        --border:rgba(0,0,0,.12);
+        --preview:#f6f8fc;
+      }
+    }
+
+    /* Forced themes via data-theme */
+    html[data-theme="dark"]{
+      --bg:#0b1220;
+      --card:#0f1a2f;
+      --field:#0b1428;
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.65);
+      --border:rgba(255,255,255,.12);
+      --preview:#081024;
+    }
+    html[data-theme="light"]{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --field:#f3f5f9;
+      --text:rgba(0,0,0,.88);
+      --muted:rgba(0,0,0,.55);
+      --border:rgba(0,0,0,.12);
+      --preview:#f6f8fc;
+    }
+
+    body { background:var(--bg); transition: background .2s ease; }
+    .card { border:0; border-radius:16px; background:var(--card); transition: background .2s ease; }
+    label, h1, h2, h3, h4, h5, h6 { color: var(--text)!important; }
+    .small-note, .hint, .form-text { color: var(--muted)!important; }
+    .small-note { font-size:.9rem; }
+    .hint { font-size:.85rem; }
+
+    .form-control, .form-select{
+      background:var(--field);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:12px;
+      transition: background .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .form-control:focus, .form-select:focus{
+      border-color: rgba(13,110,253,.6);
+      box-shadow: 0 0 0 .2rem rgba(13,110,253,.15);
+      background:var(--field);
+      color:var(--text);
+    }
+
+    pre.preview{
+      white-space: pre-wrap;
+      background:var(--preview);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:14px;
+      color:var(--text);
+      min-height: 420px;
+      transition: background .2s ease, color .2s ease, border-color .2s ease;
+    }
+
+    .btn{ border-radius:12px; }
+
+    .badge-soft{
+      background: rgba(13,110,253,.15);
+      color:#2c6cff;
+      border:1px solid rgba(13,110,253,.25);
+    }
+    html[data-theme="dark"] .badge-soft{ color:#9dc2ff; }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+
+<body>
+  <div class="container py-4 py-lg-5">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <h1 class="h3 mb-1">YouTube Description Generator</h1>
+        <div class="small-note">Presets + Hashtags + Chapters (auto from duration) + Save templates + Auto Light/Dark.</div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <select id="themeMode" class="form-select form-select-sm" style="width:140px;">
+          <option value="auto">Auto (System)</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+        <span class="badge badge-soft px-3 py-2">Best tools</span>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- Left: Inputs -->
+      <div class="col-lg-6">
+        <div class="card p-3 p-lg-4">
+
+          <!-- Presets + Save/Load -->
+          <h2 class="h5 mb-3">Quick tools</h2>
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Template Preset</label>
+              <select id="presetSelect" class="form-select">
+                <option value="">-- Choose preset --</option>
+                <option value="khmer_remix">Khmer Remix</option>
+                <option value="dj_mix">DJ Mix</option>
+                <option value="vlog">Vlog</option>
+                <option value="tutorial">Tutorial</option>
+              </select>
+              <div class="hint mt-1">Choose preset then edit anything.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Saved templates</label>
+              <select id="savedSelect" class="form-select">
+                <option value="">-- None --</option>
+              </select>
+              <div class="hint mt-1" id="storageInfo">No saved templates yet.</div>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-4">
+            <div class="col-md-6">
+              <label class="form-label">Save name</label>
+              <input id="saveName" class="form-control" placeholder="my-template-1">
+            </div>
+            <div class="col-md-6 d-flex gap-2 align-items-end">
+              <button id="btnSaveLocal" class="btn btn-success w-100">Save</button>
+              <button id="btnDeleteLocal" class="btn btn-outline-danger w-100">Delete</button>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 mb-4">
+            <button id="btnExportJson" class="btn btn-outline-info w-100">Export JSON</button>
+            <button id="btnImportJson" class="btn btn-outline-warning w-100">Import JSON</button>
+            <input id="importFile" type="file" accept="application/json" hidden>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">1) Video Info</h2>
+
+          <div class="mb-3">
+            <label class="form-label">Please watch / Video title</label>
+            <input id="videoTitle" class="form-control" placeholder='Ed Sheeran - Shape of You NEW Remix 2018 BY [ TCD ] | ...'>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Video link (optional)</label>
+            <input id="videoLink" class="form-control" placeholder="https://www.youtube.com/watch?v=xxxx">
+            <div class="form-text">If empty, it will only show the title line.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Main description (text)</label>
+            <textarea id="mainDesc" class="form-control" rows="7"
+              placeholder="Enjoy my video song remix and popular song and audio spectrum..."></textarea>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">2) Designer / Creator</h2>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Designer name</label>
+              <input id="designerName" class="form-control" placeholder="{@Mr. E Top Channel}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Designer YouTube (optional)</label>
+              <input id="designerYT" class="form-control" placeholder="Mr. E Top Channel">
+            </div>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">3) Subscribe line</h2>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Subscribe message</label>
+              <input id="subscribeMsg" class="form-control" value="►♫Please subscribe to support us♫">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Channel name</label>
+              <input id="channelName" class="form-control" value="Mrr CHav CHav Official™">
+            </div>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-2">4) Social links</h2>
+          <div class="small-note mb-2">One per line: <span class="mono">Label | URL</span></div>
+
+          <div class="mb-2">
+            <textarea id="socialLinks" class="form-control" rows="6"
+placeholder="YouTube: Mr. E Top Channel | /mretopchannel
+YouTube: Mrr CHav CHav Official | /mrrchavchavofficial
+Instagram | /suk_sok_e
+Facebook Page | https://www.facebook.com/suksoke
+Website | http://www.suksoke.com/
+Twitter | /suk_sok
+Vimeo | https://vimeo.com/user65054288"></textarea>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-2">5) Promote section</h2>
+          <div class="small-note mb-2">One per line: <span class="mono">Name | URL</span></div>
+          <textarea id="promoteList" class="form-control" rows="5"
+placeholder="Smey PSN | https://www.youtube.com/channel/UCjJv...
+Lorrain | /@lorrainelectromusic
+SV Dee | https://www.youtube.com/channel/UCZlT...
+Hea Lepp | /healepp
+FB : Veng | /veng143"></textarea>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">Divider line (editable)</h2>
+          <div class="small-note mb-2">Client can customize the separator line:</div>
+          <input id="dividerText" class="form-control"
+                 value="●▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ஜ۩۞۩ஜ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬●">
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">Hashtag generator</h2>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Hashtag topic</label>
+              <input id="hashtagTopic" class="form-control" placeholder="khmer remix, dj mix, vlog, tutorial...">
+              <div class="hint mt-1">Try: <span class="mono">khmer remix</span>, <span class="mono">dj mix</span>, <span class="mono">vlog</span>, <span class="mono">tutorial</span></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Custom hashtags (comma separated)</label>
+              <input id="hashtagCustom" class="form-control" placeholder="#mychannel, #newmusic">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Hashtag style</label>
+            <select id="hashtagStyle" class="form-select">
+              <option value="inline">Inline (one line)</option>
+              <option value="multiline">Multi-line</option>
+            </select>
+            <div class="form-text">Tip: YouTube often shows the first 3 hashtags above the title.</div>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">Chapters</h2>
+          <div class="row g-2 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Chapter mode</label>
+              <select id="chapterMode" class="form-select">
+                <option value="off">Off</option>
+                <option value="from_lines">Generate from chapter lines</option>
+                <option value="fixed_interval">Generate fixed interval</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Chapters title</label>
+              <input id="chapterTitle" class="form-control" value="Chapters:">
+            </div>
+          </div>
+
+          <!-- Duration + distribution -->
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Video duration (mm:ss)</label>
+              <input id="videoDuration" class="form-control" placeholder="10:30" value="">
+              <div class="form-text">Required to auto-distribute timestamps from chapter lines.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Distribute method</label>
+              <select id="chapterDistribute" class="form-select">
+                <option value="keep_0000">Keep first at 00:00 (recommended)</option>
+                <option value="even">Even spacing</option>
+              </select>
+              <div class="form-text">Most YouTube chapters start at 00:00.</div>
+            </div>
+          </div>
+
+          <div id="chapterBox" class="mb-3 d-none">
+            <div class="row g-2">
+              <div class="col-md-7" id="chapterLinesBox">
+                <label class="form-label">Chapter names (one per line)</label>
+                <textarea id="chapterLines" class="form-control" rows="5"
+                  placeholder="Intro
+Best part
+Drop / Bass
+Thanks"></textarea>
+                <div class="form-text">If duration is empty, it will fallback to 1-minute steps.</div>
+              </div>
+
+              <div class="col-md-5" id="chapterIntervalBox" style="display:none;">
+                <label class="form-label">Interval (minutes)</label>
+                <input id="chapterIntervalMin" class="form-control" type="number" min="1" value="2">
+                <div class="form-text mb-2">Example: 2 → 00:00, 02:00, 04:00…</div>
+
+                <label class="form-label">How many chapters?</label>
+                <input id="chapterCount" class="form-control" type="number" min="2" value="6">
+              </div>
+            </div>
+          </div>
+
+          <hr class="border border-white border-opacity-10 my-4">
+
+          <h2 class="h5 mb-3">Copyright line</h2>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Year from</label>
+              <input id="yearFrom" class="form-control" value="2017">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Year to</label>
+              <input id="yearTo" class="form-control" value="2018">
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">Copyright owner</label>
+            <input id="copyrightOwner" class="form-control" value="@Mrr CHav CHav Official">
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mt-4">
+            <button id="btnGenerate" class="btn btn-primary">Generate</button>
+            <button id="btnCopy" class="btn btn-outline-secondary">Copy</button>
+            <button id="btnDownload" class="btn btn-outline-info">Download .txt</button>
+            <button id="btnClear" class="btn btn-outline-danger ms-auto">Clear</button>
+          </div>
+
+          <div id="toast" class="mt-3 small-note"></div>
+        </div>
+      </div>
+
+      <!-- Right: Output -->
+      <div class="col-lg-6">
+        <div class="card p-3 p-lg-4">
+          <h2 class="h5 mb-2">Output (YouTube Description)</h2>
+          <div class="small-note mb-3">Click “Generate”, then “Copy” and paste into YouTube description.</div>
+          <pre id="preview" class="preview"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery + Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ----------------- Helpers -----------------
+    function safeTrim(s){ return (s || "").toString().trim(); }
+
+    function parseLines(text) {
+      const lines = safeTrim(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const out = [];
+      for (const line of lines) {
+        const parts = line.split("|").map(x => x.trim());
+        if (parts.length >= 2) out.push({ label: parts[0], url: parts.slice(1).join(" | ") });
+        else out.push({ label: line, url: "" });
+      }
+      return out;
+    }
+
+    function showToast(msg, ok=true) {
+      $("#toast").html(ok ? "✅ " + msg : "⚠️ " + msg);
+      setTimeout(() => $("#toast").html(""), 2200);
+    }
+
+    function dividerLine() {
+      const d = safeTrim($("#dividerText").val());
+      return d || "●▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ஜ۩۞۩ஜ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬●";
+    }
+
+    // ----------------- Theme (Auto/System + Light/Dark) -----------------
+    const THEME_KEY = "yt_theme_mode_v1"; // auto | light | dark
+
+    function applyTheme(mode) {
+      if (mode === "light" || mode === "dark") {
+        document.documentElement.setAttribute("data-theme", mode);
+      } else {
+        document.documentElement.removeAttribute("data-theme"); // auto
+        mode = "auto";
+      }
+      localStorage.setItem(THEME_KEY, mode);
+      $("#themeMode").val(mode);
+    }
+
+    function initTheme() {
+      const saved = localStorage.getItem(THEME_KEY) || "auto";
+      applyTheme(saved);
+    }
+
+    // ----------------- Presets -----------------
+    const PRESETS = {
+      khmer_remix: {
+        videoTitle: 'Best Khmer Remix 2026 | Nonstop Remix Club Khmer vs Thai',
+        mainDesc:
+`Enjoy my video song remix and popular song and audio spectrum in After Effects.
+Khmer song, Thailand song, DJ mix, Remix club, dance music, nonstop.`,
+        designerName: '{@Your Channel Name}',
+        designerYT: 'Your Channel',
+        subscribeMsg: '►♫Please subscribe to support us♫',
+        channelName: 'Your Channel™',
+        socialLinks:
+`YouTube: Your Channel | /yourchannel
+Facebook Page | https://facebook.com/yourpage
+Website | https://yourwebsite.com`,
+        promoteList:
+`Friend Channel | https://youtube.com/@friend
+Sponsor | https://example.com`,
+        hashtagTopic: 'khmer remix',
+        hashtagCustom: '#khmerremix,#djmix,#nonstop'
+      },
+      dj_mix: {
+        videoTitle: 'DJ Mix 2026 | Bass Boosted Club Remix | Nonstop',
+        mainDesc:
+`Best DJ mix / club remix / bass boosted.
+Thanks for watching and supporting.`,
+        hashtagTopic: 'dj mix',
+        hashtagCustom: '#djmix,#clubremix,#bassboosted'
+      },
+      vlog: {
+        videoTitle: 'My Vlog | Day in My Life | Cambodia',
+        mainDesc:
+`Welcome to my vlog! Today we explore...
+Don’t forget to like, share, and subscribe.`,
+        hashtagTopic: 'vlog',
+        hashtagCustom: '#vlog,#dailyvlog,#cambodia'
+      },
+      tutorial: {
+        videoTitle: 'After Effects Tutorial | Audio Spectrum | Full HD',
+        mainDesc:
+`In this tutorial, you will learn:
+1) Setup project
+2) Create audio spectrum
+3) Export in Full HD`,
+        hashtagTopic: 'tutorial',
+        hashtagCustom: '#aftereffects,#tutorial,#motiongraphics'
+      }
+    };
+
+    function applyPreset(key) {
+      if (!key || !PRESETS[key]) return;
+      const p = PRESETS[key];
+
+      const ids = [
+        "videoTitle","videoLink","mainDesc",
+        "designerName","designerYT",
+        "subscribeMsg","channelName",
+        "socialLinks","promoteList",
+        "hashtagTopic","hashtagCustom"
+      ];
+
+      ids.forEach(id => {
+        if (typeof p[id] !== "undefined") $("#" + id).val(p[id]);
+      });
+
+      generate();
+      showToast("Preset applied");
+    }
+
+    // ----------------- Hashtags -----------------
+    function normalizeHashtag(s) {
+      s = safeTrim(s);
+      if (!s) return "";
+      s = s.replace(/\s+/g, "");
+      return s.startsWith("#") ? s : "#" + s;
+    }
+
+    function buildHashtags() {
+      const topic = safeTrim($("#hashtagTopic").val()).toLowerCase();
+      const customRaw = safeTrim($("#hashtagCustom").val());
+      const tags = new Set();
+
+      const map = {
+        "khmer remix": ["#khmerremix","#khmermusic","#remix","#nonstop","#clubmix"],
+        "dj mix": ["#djmix","#clubremix","#nonstop","#bassboosted","#edm"],
+        "vlog": ["#vlog","#dailyvlog","#lifestyle","#travel","#cambodia"],
+        "tutorial": ["#tutorial","#howto","#aftereffects","#editing","#motiongraphics"]
+      };
+
+      if (topic && map[topic]) map[topic].forEach(t => tags.add(t));
+
+      if (topic) {
+        topic.split(/[,/]+/).map(x=>x.trim()).filter(Boolean).forEach(x=>{
+          tags.add(normalizeHashtag(x.replace(/\s+/g,"")));
+        });
+      }
+
+      if (customRaw) {
+        customRaw.split(/[,]+/).map(x => x.trim()).filter(Boolean).forEach(x => {
+          tags.add(normalizeHashtag(x));
+        });
+      }
+
+      return Array.from(tags).filter(Boolean).slice(0, 15);
+    }
+
+    function hashtagsToText(tags) {
+      if (!tags.length) return "";
+      const style = $("#hashtagStyle").val();
+      return (style === "multiline") ? tags.join("\n") : tags.join(" ");
+    }
+
+    // ----------------- Chapters -----------------
+    function pad2(n){ return String(n).padStart(2, "0"); }
+    function toTimestamp(totalSeconds) {
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return `${pad2(m)}:${pad2(s)}`;
+    }
+
+    function parseDurationToSeconds(mmss) {
+      const s = safeTrim(mmss);
+      if (!s) return null;
+      const m = s.match(/^(\d{1,3}):([0-5]\d)$/); // 0:00 to 999:59
+      if (!m) return null;
+      const minutes = parseInt(m[1], 10);
+      const seconds = parseInt(m[2], 10);
+      return minutes * 60 + seconds;
+    }
+
+    function buildChapters() {
+      const mode = $("#chapterMode").val();
+      if (mode === "off") return "";
+
+      const title = safeTrim($("#chapterTitle").val()) || "Chapters:";
+
+      if (mode === "from_lines") {
+        const lines = safeTrim($("#chapterLines").val())
+          .split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+        if (lines.length < 2) return "";
+
+        const totalSec = parseDurationToSeconds($("#videoDuration").val());
+        const method = $("#chapterDistribute").val() || "keep_0000";
+
+        // If duration missing/invalid, fallback to 1-minute steps
+        if (!totalSec) {
+          const outFallback = [title];
+          lines.forEach((name, i) => outFallback.push(`${toTimestamp(i * 60)} ${name}`));
+          return outFallback.join("\n");
+        }
+
+        // We spread timestamps from 0..(totalSec-1)
+        const n = lines.length;
+        const end = Math.max(0, totalSec - 1);
+        const out = [title];
+
+        for (let i = 0; i < n; i++) {
+          let tSec;
+          if (n === 1) tSec = 0;
+          else tSec = Math.round((end * i) / (n - 1));
+
+          if (method === "keep_0000" && i === 0) tSec = 0;
+
+          out.push(`${toTimestamp(tSec)} ${lines[i]}`);
+        }
+
+        return out.join("\n");
+      }
+
+      if (mode === "fixed_interval") {
+        const intervalMin = parseInt($("#chapterIntervalMin").val(), 10);
+        const count = parseInt($("#chapterCount").val(), 10);
+        if (!intervalMin || !count || count < 2) return "";
+
+        const out = [title];
+        for (let i = 0; i < count; i++) {
+          out.push(`${toTimestamp(i * intervalMin * 60)} Chapter ${i+1}`);
+        }
+        return out.join("\n");
+      }
+
+      return "";
+    }
+
+    function syncChapterUI() {
+      const mode = $("#chapterMode").val();
+      if (mode === "off") {
+        $("#chapterBox").addClass("d-none");
+        return;
+      }
+      $("#chapterBox").removeClass("d-none");
+      if (mode === "from_lines") {
+        $("#chapterLinesBox").show();
+        $("#chapterIntervalBox").hide();
+      } else if (mode === "fixed_interval") {
+        $("#chapterLinesBox").hide();
+        $("#chapterIntervalBox").show();
+      }
+    }
+
+    // ----------------- LocalStorage templates -----------------
+    const STORAGE_KEY = "yt_desc_builder_templates_v1";
+
+    function getAllTemplates() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+      catch (e) { return {}; }
+    }
+
+    function setAllTemplates(obj) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+      refreshSavedSelect();
+    }
+
+    function collectFormState() {
+      const ids = [
+        "videoTitle","videoLink","mainDesc",
+        "designerName","designerYT",
+        "subscribeMsg","channelName",
+        "socialLinks","promoteList",
+        "yearFrom","yearTo","copyrightOwner",
+        "dividerText",
+        "hashtagTopic","hashtagCustom","hashtagStyle",
+        "chapterMode","chapterTitle","chapterLines","chapterIntervalMin","chapterCount",
+        "videoDuration","chapterDistribute"
+      ];
+      const data = {};
+      ids.forEach(id => data[id] = $("#" + id).val());
+      return data;
+    }
+
+    function applyFormState(data) {
+      if (!data) return;
+      Object.keys(data).forEach(id => {
+        const el = $("#" + id);
+        if (el.length) el.val(data[id]);
+      });
+      syncChapterUI();
+      generate();
+    }
+
+    function refreshSavedSelect() {
+      const all = getAllTemplates();
+      const names = Object.keys(all).sort((a,b)=>a.localeCompare(b));
+      const sel = $("#savedSelect");
+      sel.empty();
+
+      if (!names.length) {
+        sel.append(new Option("-- None --", ""));
+        $("#storageInfo").text("No saved templates yet.");
+        return;
+      }
+
+      sel.append(new Option("-- Choose saved --", ""));
+      names.forEach(n => sel.append(new Option(n, n)));
+      $("#storageInfo").text("Saved templates: " + names.join(", "));
+    }
+
+    // ----------------- Build Description -----------------
+    function buildDescription() {
+      const title = safeTrim($("#videoTitle").val());
+      const link  = safeTrim($("#videoLink").val());
+      const main  = safeTrim($("#mainDesc").val());
+
+      const designerName = safeTrim($("#designerName").val());
+      const designerYT   = safeTrim($("#designerYT").val());
+
+      const subscribeMsg = safeTrim($("#subscribeMsg").val());
+      const channelName  = safeTrim($("#channelName").val());
+
+      const social = parseLines($("#socialLinks").val());
+      const promote = parseLines($("#promoteList").val());
+
+      const yearFrom = safeTrim($("#yearFrom").val());
+      const yearTo   = safeTrim($("#yearTo").val());
+      const owner    = safeTrim($("#copyrightOwner").val());
+
+      const parts = [];
+
+      if (title) {
+        if (link) parts.push(`Please watch: "${title}"\n${link}`);
+        else parts.push(`Please watch: "${title}"`);
+      }
+
+      if (main) parts.push(main);
+
+      if (designerName || designerYT) {
+        parts.push(`Designer & Creator Video By: ${designerName || ""}`.trim());
+        if (designerYT) parts.push(`✔ YouTube: ${designerYT}`);
+      }
+
+      const div = dividerLine();
+      parts.push(div);
+      if (subscribeMsg) parts.push(subscribeMsg);
+      if (channelName) parts.push(`✔ ♫ ${channelName} ♫ ✔`);
+      parts.push(div);
+
+      if (social.length) {
+        parts.push("●▬▬▬▬▬♥Follw Me♥▬▬▬▬▬●");
+        for (const item of social) {
+          if (item.url) parts.push(`✔ ${item.label}\n►Link : ${item.url}`);
+          else parts.push(`✔ ${item.label}`);
+        }
+      }
+
+      if (promote.length) {
+        parts.push("Promote");
+        for (const p of promote) {
+          if (p.url) parts.push(`${p.label}\n${p.url}`);
+          else parts.push(`${p.label}`);
+        }
+      }
+
+      const tags = buildHashtags();
+      const tagText = hashtagsToText(tags);
+      if (tagText) parts.push(tagText);
+
+      const chapters = buildChapters();
+      if (chapters) parts.push(chapters);
+
+      if (owner || (yearFrom && yearTo)) {
+        const y = (yearFrom && yearTo) ? `${yearFrom} - ${yearTo}` : (yearFrom || yearTo || "");
+        parts.push(`//Copyright: ©${y} ${owner}//`.trim());
+      }
+
+      return parts.join("\n\n")
+        .replace(/\n{4,}/g, "\n\n\n")
+        .trim() + "\n";
+    }
+
+    function generate() {
+      const out = buildDescription();
+      $("#preview").text(out || "Fill the form and click Generate...");
+      return out;
+    }
+
+    async function copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Copied to clipboard!");
+      } catch (e) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast("Copied (fallback)!");
+      }
+    }
+
+    function downloadTxt(filename, text) {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ----------------- Init -----------------
+    $(function () {
+      initTheme();
+      $("#themeMode").on("change", function () {
+        applyTheme($(this).val());
+      });
+
+      $("#preview").text("Fill the form and click Generate...");
+      refreshSavedSelect();
+      syncChapterUI();
+
+      // Generate / Copy / Download / Clear
+      $("#btnGenerate").on("click", function () {
+        const out = generate();
+        if (!out.trim()) showToast("Nothing to generate. Add some content.", false);
+      });
+
+      $("#btnCopy").on("click", async function () {
+        const out = generate();
+        if (!out.trim()) return showToast("Nothing to copy.", false);
+        await copyToClipboard(out);
+      });
+
+      $("#btnDownload").on("click", function () {
+        const out = generate();
+        if (!out.trim()) return showToast("Nothing to download.", false);
+        const title = safeTrim($("#videoTitle").val()) || "youtube-description";
+        const safeName = title.replace(/[^\w\-]+/g, "_").slice(0, 60);
+        downloadTxt(safeName + ".txt", out);
+        showToast("Downloaded .txt");
+      });
+
+      $("#btnClear").on("click", function () {
+        $("input, textarea").val("");
+        $("#subscribeMsg").val("►♫Please subscribe to support us♫");
+        $("#channelName").val("Mrr CHav CHav Official™");
+        $("#yearFrom").val("2017");
+        $("#yearTo").val("2018");
+        $("#copyrightOwner").val("@Mrr CHav CHav Official");
+        $("#dividerText").val("●▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ஜ۩۞۩ஜ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬●");
+        $("#hashtagStyle").val("inline");
+        $("#chapterMode").val("off");
+        $("#chapterTitle").val("Chapters:");
+        $("#chapterIntervalMin").val("2");
+        $("#chapterCount").val("6");
+        $("#videoDuration").val("");
+        $("#chapterDistribute").val("keep_0000");
+        $("#presetSelect").val("");
+        syncChapterUI();
+        $("#preview").text("Fill the form and click Generate...");
+        showToast("Cleared");
+      });
+
+      // Live preview
+      $("input, textarea, select").on("input change", function () {
+        generate();
+      });
+
+      // Preset apply
+      $("#presetSelect").on("change", function () {
+        applyPreset($(this).val());
+      });
+
+      // Chapters UI
+      $("#chapterMode").on("change", function(){
+        syncChapterUI();
+        generate();
+      });
+
+      // Save template
+      $("#btnSaveLocal").on("click", function () {
+        const name = safeTrim($("#saveName").val());
+        if (!name) return showToast("Please enter Save name", false);
+
+        const all = getAllTemplates();
+        all[name] = collectFormState();
+        setAllTemplates(all);
+        $("#savedSelect").val(name);
+        showToast("Saved: " + name);
+      });
+
+      // Load template
+      $("#savedSelect").on("change", function () {
+        const pick = $(this).val();
+        if (!pick) return;
+        const all = getAllTemplates();
+        if (!all[pick]) return showToast("Template not found", false);
+        applyFormState(all[pick]);
+        $("#saveName").val(pick);
+        showToast("Loaded: " + pick);
+      });
+
+      // Delete template
+      $("#btnDeleteLocal").on("click", function () {
+        const pick = $("#savedSelect").val() || safeTrim($("#saveName").val());
+        if (!pick) return showToast("Select template to delete", false);
+
+        const all = getAllTemplates();
+        if (!all[pick]) return showToast("Not found: " + pick, false);
+        if (!confirm("Delete template: " + pick + " ?")) return;
+
+        delete all[pick];
+        setAllTemplates(all);
+        $("#savedSelect").val("");
+        $("#saveName").val("");
+        showToast("Deleted: " + pick);
+      });
+
+      // Export JSON
+      $("#btnExportJson").on("click", function () {
+        const all = getAllTemplates();
+        const blob = new Blob([JSON.stringify(all, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "yt-templates.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("Exported JSON");
+      });
+
+      // Import JSON
+      $("#btnImportJson").on("click", function () {
+        $("#importFile").click();
+      });
+
+      $("#importFile").on("change", function (e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function () {
+          try {
+            const imported = JSON.parse(reader.result);
+            if (typeof imported !== "object" || Array.isArray(imported) || imported === null) {
+              return showToast("Invalid JSON format", false);
+            }
+            const all = getAllTemplates();
+            Object.assign(all, imported);
+            setAllTemplates(all);
+            showToast("Imported JSON");
+          } catch (err) {
+            showToast("Import failed: invalid JSON", false);
+          }
+        };
+        reader.readAsText(file);
+        $("#importFile").val("");
+      });
+
+      // First generate
+      generate();
+    });
+  </script>
+</body>
+</html>
